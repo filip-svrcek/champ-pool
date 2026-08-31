@@ -1,0 +1,22 @@
+:root{
+  --bg: #0f172a;
+  --card: #0b1220;
+  --accent: #60a5fa;
+  --muted: #94a3b8;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:#fff}
+.app{padding:16px;max-width:1100px;margin:0 auto}
+header{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.controls input{padding:8px;border-radius:6px;border:1px solid #21303f;background:#071022;color:#fff;margin-right:8px}
+.controls button{padding:8px 10px;border-radius:6px;border:0;background:var(--accent);color:#012}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px;margin-top:16px}
+.card{display:flex;flex-direction:column;align-items:center;padding:8px;border-radius:8px;background:var(--card);text-align:center;color:#fff;cursor:pointer}
+.card img{width:72px;height:72px;object-fit:contain}
+.card .name{margin-top:8px;font-size:12px}
+.card input{position:relative;margin-bottom:6px}
+.card.checked{opacity:0.45;filter:grayscale(0.6) sepia(0.2)}
+.sessions{margin-top:20px}
+.sessions ul{list-style:none;padding:0}
+.sessions li{margin-bottom:6px}
+.sessions button{background:#172033;border:0;color:#fff;padding:6px 8px;border-radius:6px}
