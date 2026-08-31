@@ -86,7 +86,7 @@ export default function App() {
   return (
     <div className="app">
       <header>
-        <h1>Champ Pool — Fearless Draft</h1>
+        <h1>Champ Pool</h1>
         <div className="controls">
           <input placeholder="Session name (optional)" value={sessionName} onChange={e => setSessionName(e.target.value)} />
           <button onClick={saveSession}>Save session</button>

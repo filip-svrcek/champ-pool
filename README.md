@@ -1,4 +1,4 @@
-# Champ Pool — Fearless Draft
+# Champ Pool
 
 Small React + Vite app to list League of Legends champions and cross them off for fearless draft. Sessions can be saved to Supabase.
 
