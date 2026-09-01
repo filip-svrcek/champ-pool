@@ -21,6 +21,7 @@ export default function App() {
   const [sessions, setSessions] = useState([])
   const [hideChecked, setHideChecked] = useState(false)
   const [isLive, setIsLive] = useState(false)
+  const [hydrated, setHydrated] = useState(false)
   const availableCount = champions.filter(c => !checked.has(c.id)).length
 
   useEffect(() => {
@@ -49,7 +50,23 @@ export default function App() {
 
   useEffect(() => {
     fetchSessions()
+    try {
+      const cur = JSON.parse(localStorage.getItem('champ-pool.current') || 'null')
+      if (cur && cur.checked && !isLive) setChecked(new Set(cur.checked))
+    } catch (e) {
+      console.error('localStorage read failed', e)
+    }
+    // mark hydration complete so autosave doesn't clobber loaded state
+    setHydrated(true)
   }, [])
+  // autosave current non-live state to localStorage
+  useEffect(() => {
+    if (isLive || !hydrated) return
+    const payload = { checked: Array.from(checked), updated_at: new Date().toISOString() }
+    try { localStorage.setItem('champ-pool.current', JSON.stringify(payload)) } catch (e) { console.error(e) }
+  }, [checked, isLive, hydrated])
+
+  
 
   function toggle(id) {
     const next = new Set(checked)
@@ -136,7 +153,7 @@ export default function App() {
       </section>
 
       <aside className="sessions">
-        <h3>Saved Sessions</h3>
+        <h3>Saved Sessions (Supabase)</h3>
         <ul>
           {sessions.map(s => (
             <li key={s.id}>
