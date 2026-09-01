@@ -20,6 +20,8 @@ export default function App() {
   const [checked, setChecked] = useState(new Set())
   const [sessions, setSessions] = useState([])
   const [sessionName, setSessionName] = useState('')
+  const [hideChecked, setHideChecked] = useState(false)
+  const availableCount = champions.filter(c => !checked.has(c.id)).length
 
   useEffect(() => {
     let mounted = true
@@ -86,16 +88,20 @@ export default function App() {
   return (
     <div className="app">
       <header>
-        <h1>Champ Pool</h1>
+        <h1>Champ Pool <span className="available">({availableCount} available of {champions.length})</span></h1>
         <div className="controls">
           <input placeholder="Session name (optional)" value={sessionName} onChange={e => setSessionName(e.target.value)} />
           <button onClick={saveSession}>Save session</button>
           <button onClick={() => setChecked(new Set())}>Clear all</button>
+          <label style={{marginLeft:8,display:'inline-flex',alignItems:'center',gap:8}}>
+            <input type="checkbox" checked={hideChecked} onChange={e => setHideChecked(e.target.checked)} />
+            Hide checked
+          </label>
         </div>
       </header>
 
       <section className="grid">
-        {champions.map(c => (
+        {champions.filter(c => !hideChecked || !checked.has(c.id)).map(c => (
           <ChampionCard key={c.id} champ={c} checked={checked.has(c.id)} onToggle={toggle} />
         ))}
       </section>
