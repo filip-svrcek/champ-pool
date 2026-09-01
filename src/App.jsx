@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { supabase } from './supabaseClient'
 
 function ChampionCard({ champ, checked, onToggle }) {
@@ -22,7 +22,9 @@ export default function App() {
   const [hideChecked, setHideChecked] = useState(false)
   const [isLive, setIsLive] = useState(false)
   const [hydrated, setHydrated] = useState(false)
+  const [liveSessionId, setLiveSessionId] = useState(null)
   const availableCount = champions.filter(c => !checked.has(c.id)).length
+  const liveChannelRef = useRef(null)
 
   useEffect(() => {
     let mounted = true
@@ -73,6 +75,8 @@ export default function App() {
     if (next.has(id)) next.delete(id)
     else next.add(id)
     setChecked(next)
+    // if live, push update
+    if (isLive && liveSessionId) updateLiveSession(liveSessionId, next)
   }
 
   async function saveSession() {
@@ -86,10 +90,49 @@ export default function App() {
     }
   }
 
+  // create a live session row
+  async function createLiveSession() {
+    const payload = { checked: Array.from(checked) }
+    const name = `Live ${new Date().toLocaleString()}`
+    const { data, error } = await supabase.from('sessions').insert([{ name, payload }]).select().single()
+    if (error) {
+      console.error('createLiveSession error', error)
+      alert('Failed to create live session: ' + error.message)
+      return null
+    }
+    return data?.id ?? null
+  }
+
+  async function updateLiveSession(id, checkedSet) {
+    if (!id) return
+    const payload = { checked: Array.from(checkedSet) }
+    const { error } = await supabase.from('sessions').update({ payload }).eq('id', id)
+    if (error) console.error('updateLiveSession error', error)
+  }
+
+  async function subscribeToLiveSession(id) {
+    if (!id) return
+    if (liveChannelRef.current) {
+      try { await liveChannelRef.current.unsubscribe() } catch (e) { }
+      liveChannelRef.current = null
+    }
+    const channel = supabase.channel(`realtime-sessions-${id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions', filter: `id=eq.${id}` }, (payload) => {
+        const record = payload?.new || payload?.record || payload
+        try {
+          const arr = record?.payload?.checked || []
+          setChecked(new Set(arr))
+        } catch (e) { console.error('failed to apply realtime update', e) }
+      })
+    await channel.subscribe()
+    liveChannelRef.current = channel
+    return channel
+  }
+
   async function handleShare() {
     if (!isLive) return
-    const state = Array.from(checked)
-    const url = `${window.location.origin}${window.location.pathname}#live=${encodeURIComponent(JSON.stringify(state))}`
+    const sessionPart = liveSessionId ? `?session=${liveSessionId}` : `#live=${encodeURIComponent(JSON.stringify(Array.from(checked)))}`
+    const url = `${window.location.origin}${window.location.pathname}${sessionPart}`
     try {
       if (navigator.share) {
         await navigator.share({ title: 'Champ Pool Live Session', url })
@@ -118,6 +161,43 @@ export default function App() {
       console.error(e)
     }
   }
+
+  // when toggling live mode, create/join session and subscribe
+  useEffect(() => {
+    let mounted = true
+    if (isLive) {
+      ;(async () => {
+        if (!liveSessionId) {
+          const id = await createLiveSession()
+          if (!mounted) return
+          if (id) setLiveSessionId(id)
+        }
+      })()
+    } else {
+      if (liveChannelRef.current) {
+        try { liveChannelRef.current.unsubscribe() } catch (e) {}
+        liveChannelRef.current = null
+      }
+      setLiveSessionId(null)
+    }
+    return () => { mounted = false }
+  }, [isLive])
+
+  useEffect(() => {
+    if (!liveSessionId) return
+    let mounted = true
+    ;(async () => {
+      await subscribeToLiveSession(liveSessionId)
+      await updateLiveSession(liveSessionId, checked)
+    })()
+    return () => {
+      mounted = false
+      if (liveChannelRef.current) {
+        try { liveChannelRef.current.unsubscribe() } catch (e) {}
+        liveChannelRef.current = null
+      }
+    }
+  }, [liveSessionId])
 
   return (
     <div className="app">
