@@ -19,8 +19,8 @@ export default function App() {
   const [champions, setChampions] = useState([])
   const [checked, setChecked] = useState(new Set())
   const [sessions, setSessions] = useState([])
-  const [sessionName, setSessionName] = useState('')
   const [hideChecked, setHideChecked] = useState(false)
+  const [isLive, setIsLive] = useState(false)
   const availableCount = champions.filter(c => !checked.has(c.id)).length
 
   useEffect(() => {
@@ -59,14 +59,31 @@ export default function App() {
   }
 
   async function saveSession() {
-    const name = sessionName || `Session ${new Date().toLocaleString()}`
+    const name = `Session ${new Date().toLocaleString()}`
     const payload = { checked: Array.from(checked) }
     const { data, error } = await supabase.from('sessions').insert([{ name, payload }])
     if (error) {
       alert('Save failed: ' + error.message)
     } else {
-      setSessionName('')
       fetchSessions()
+    }
+  }
+
+  async function handleShare() {
+    if (!isLive) return
+    const state = Array.from(checked)
+    const url = `${window.location.origin}${window.location.pathname}#live=${encodeURIComponent(JSON.stringify(state))}`
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Champ Pool Live Session', url })
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(url)
+        alert('Share URL copied to clipboard')
+      } else {
+        prompt('Copy this share URL', url)
+      }
+    } catch (e) {
+      try { await navigator.clipboard.writeText(url); alert('Share URL copied to clipboard') } catch { alert('Unable to share') }
     }
   }
 
@@ -90,13 +107,25 @@ export default function App() {
       <header>
         <h1>Champ Pool <span className="available">({availableCount} available of {champions.length})</span></h1>
         <div className="controls">
-          <input placeholder="Session name (optional)" value={sessionName} onChange={e => setSessionName(e.target.value)} />
-          <button onClick={saveSession}>Save session</button>
-          <button onClick={() => setChecked(new Set())}>Clear all</button>
-          <label style={{marginLeft:8,display:'inline-flex',alignItems:'center',gap:8}}>
-            <input type="checkbox" checked={hideChecked} onChange={e => setHideChecked(e.target.checked)} />
-            Hide checked
-          </label>
+          <div style={{marginLeft:8,display:'inline-flex',alignItems:'center',gap:12}}>
+            <div style={{display:'inline-flex',alignItems:'center',gap:8,alignItems:'center'}}>
+              <label className="switch">
+                <input type="checkbox" checked={hideChecked} onChange={e => setHideChecked(e.target.checked)} />
+                <span className="slider" />
+              </label>
+              <span style={{fontSize:13,color:'#94a3b8'}}>Hide checked</span>
+            </div>
+
+            <div style={{display:'inline-flex',alignItems:'center',gap:8}}>
+              <label className="switch">
+                <input type="checkbox" checked={isLive} onChange={e => setIsLive(e.target.checked)} />
+                <span className="slider" />
+              </label>
+              <span style={{fontSize:13,color:'#94a3b8'}}>Live Session</span>
+            </div>
+
+            <button onClick={handleShare} disabled={!isLive} style={{marginLeft:8,opacity: isLive?1:0.5}}>Share</button>
+          </div>
         </div>
       </header>
 
