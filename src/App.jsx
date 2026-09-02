@@ -1,19 +1,15 @@
 import React, { useEffect, useState, useRef } from 'react'
+import ChampionCard from './components/ChampionCard'
+import LiveSessionModal from './components/LiveSessionModal'
+import Toast from './components/Toast'
+import { fetchChampionList } from './lib/championData'
+import {
+  createLiveSession,
+  fetchSessions,
+  loadLiveSessionById,
+  updateLiveSession,
+} from './lib/liveSession'
 import { supabase } from './supabaseClient'
-
-function ChampionCard({ champ, checked, onToggle }) {
-  return (
-    <label className={`card ${checked ? 'checked' : ''}`}>
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={() => onToggle(champ.id)}
-      />
-      <img src={champ.img} alt={champ.name} />
-      <div className="name">{champ.name}</div>
-    </label>
-  )
-}
 
 export default function App() {
   const [champions, setChampions] = useState([])
@@ -37,17 +33,7 @@ export default function App() {
     let mounted = true
     async function fetchChamps() {
       try {
-        const verRes = await fetch('https://ddragon.leagueoflegends.com/api/versions.json')
-        const versions = await verRes.json()
-        const version = versions[0]
-        const res = await fetch(`https://ddragon.leagueoflegends.com/cdn/${version}/data/en_US/champion.json`)
-        const data = await res.json()
-        const list = Object.values(data.data).map(c => ({
-          id: c.id,
-          key: c.id,
-          name: c.name,
-          img: `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${c.image.full}`
-        }))
+        const list = await fetchChampionList()
         if (mounted) setChampions(list)
       } catch (e) {
         console.error('Failed to fetch champions', e)
@@ -110,37 +96,17 @@ export default function App() {
     if (error) {
       alert('Save failed: ' + error.message)
     } else {
-      fetchSessions()
+      fetchSessionsList()
     }
   }
 
-  // create a live session row
-  async function createLiveSession() {
-    const payload = { checked: Array.from(checked) }
-    const name = sessionName.trim() || `Live ${new Date().toLocaleString()}`
-    // include owner if authenticated (otherwise null) to match RLS policies
-    const owner = null
-    // // reserved for future auth-backed ownership
-    // try {
-    //   const userRes = await supabase.auth.getUser()
-    //   owner = userRes?.data?.user?.id ?? null
-    // } catch (e) {
-    //   // ignore -- unauthenticated
-    // }
-    const { data, error } = await supabase.from('sessions').insert([{ name, payload, owner }]).select().single()
-    if (error) {
-      console.error('createLiveSession error', error)
+  async function createSessionRoom() {
+    try {
+      return await createLiveSession({ checked, sessionName })
+    } catch (error) {
       alert('Failed to create live session: ' + error.message)
       return null
     }
-    return data?.id ?? null
-  }
-
-  async function updateLiveSession(id, checkedSet) {
-    if (!id) return
-    const payload = { checked: Array.from(checkedSet) }
-    const { error } = await supabase.from('sessions').update({ payload }).eq('id', id)
-    if (error) console.error('updateLiveSession error', error)
   }
 
   async function subscribeToLiveSession(id) {
@@ -180,7 +146,7 @@ export default function App() {
 
   async function handleShare() {
     if (!isLive) return
-    const targetSessionId = liveSessionId ?? await createLiveSession()
+    const targetSessionId = liveSessionId ?? await createSessionRoom()
     if (!targetSessionId) return
     setLiveSessionId(targetSessionId)
     const sessionPart = `?session=${targetSessionId}`
@@ -206,31 +172,19 @@ export default function App() {
     }
   }
 
-  async function loadLiveSessionById(sessionId) {
-    const id = Number(sessionId)
-    if (!sessionId || Number.isNaN(id)) return false
+  async function loadJoinedSession(sessionId) {
+    const data = await loadLiveSessionById(sessionId)
+    if (!data) return false
 
-    const { data, error } = await supabase
-      .from('sessions')
-      .select('id, name, payload')
-      .eq('id', id)
-      .single()
-
-    if (error || !data) {
-      console.error('Failed to load live session', error)
-      return false
-    }
-
-    setLiveSessionId(id)
+    setLiveSessionId(Number(sessionId))
     setSessionName(data.name || '')
     if (data.payload?.checked) applyCheckedState(data.payload.checked)
     return true
   }
 
-  async function fetchSessions() {
-    const { data, error } = await supabase.from('sessions').select('*').order('created_at', { ascending: false })
-    if (error) console.error(error)
-    else setSessions(data || [])
+  async function fetchSessionsList() {
+    const nextSessions = await fetchSessions()
+    setSessions(nextSessions)
   }
 
   function loadSession(s) {
@@ -277,7 +231,7 @@ export default function App() {
       ;(async () => {
         const urlSessionId = sessionQueryIdRef.current ? Number(sessionQueryIdRef.current) : null
         if (urlSessionId && !Number.isNaN(urlSessionId)) {
-          const loaded = await loadLiveSessionById(urlSessionId)
+          const loaded = await loadJoinedSession(urlSessionId)
           if (!mounted) return
           if (loaded) {
             setLiveStatus('connected')
@@ -286,7 +240,7 @@ export default function App() {
         }
 
         if (!liveSessionId) {
-          const id = await createLiveSession()
+          const id = await createSessionRoom()
           if (!mounted) return
           if (id) {
             setLiveSessionId(id)
@@ -301,6 +255,7 @@ export default function App() {
         liveChannelRef.current = null
       }
       setLiveSessionId(null)
+      sessionQueryIdRef.current = null
     }
     return () => { mounted = false }
   }, [isLive, liveSessionId])
@@ -353,38 +308,16 @@ export default function App() {
         </div>
       </header>
 
-      {toast && <div className="toast">{toast}</div>}
+      <Toast message={toast} />
 
       {liveModalOpen && (
-        <div className="modal-backdrop" onClick={cancelLiveToggle}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <h3>{pendingLiveState ? 'Start live session?' : 'Stop live session?'}</h3>
-            <p>
-              {pendingLiveState
-                ? 'Turning on live mode creates a shareable session that updates in real time for anyone using the same link.'
-                : 'Turning off live mode stops syncing this session to the shared room. Your checked list will stay local on this device.'}
-            </p>
-
-            {pendingLiveState && (
-              <label className="modal-field">
-                <span>Session name</span>
-                <input
-                  type="text"
-                  value={sessionName}
-                  onChange={e => setSessionName(e.target.value)}
-                  placeholder="Friends draft night"
-                />
-              </label>
-            )}
-
-            <div className="modal-actions">
-              <button className="secondary" onClick={cancelLiveToggle}>Cancel</button>
-              <button className="primary" onClick={confirmLiveToggle}>
-                {pendingLiveState ? 'Start live session' : 'Stop live session'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <LiveSessionModal
+          pendingLiveState={pendingLiveState}
+          sessionName={sessionName}
+          setSessionName={setSessionName}
+          onCancel={cancelLiveToggle}
+          onConfirm={confirmLiveToggle}
+        />
       )}
 
       <section className="grid">
