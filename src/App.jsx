@@ -24,6 +24,7 @@ export default function App() {
   const [pendingLiveState, setPendingLiveState] = useState(false)
   const [toast, setToast] = useState('')
   const [liveStatus, setLiveStatus] = useState('offline')
+  const [searchTerm, setSearchTerm] = useState('')
   const availableCount = champions.filter(c => !checked.has(c.id)).length
   const liveChannelRef = useRef(null)
   const sessionQueryIdRef = useRef(null)
@@ -223,6 +224,19 @@ export default function App() {
     return liveStatus === 'connecting' ? 'syncing' : 'connected'
   }
 
+  const normalizedSearch = searchTerm.trim().toLowerCase()
+  const filteredChampions = champions.filter((champ) => {
+    const matchesSearch = !normalizedSearch ||
+      champ.name.toLowerCase().includes(normalizedSearch) ||
+      (champ.title && champ.title.toLowerCase().includes(normalizedSearch)) ||
+      String(champ.id).includes(normalizedSearch)
+
+    return matchesSearch && (!hideChecked || !checked.has(champ.id))
+  })
+
+  const sessionLabel = sessionName || (isLive ? 'Live session' : 'Local draft')
+  const showSessionLabel = Boolean(sessionName)
+
   // when toggling live mode, create/join session and subscribe
   useEffect(() => {
     let mounted = true
@@ -283,27 +297,41 @@ export default function App() {
   return (
     <div className="app">
       <header>
-        <h1>Champ Pool <span className="available">({availableCount} available of {champions.length})</span></h1>
+        <div className="title-block">
+          <h1>Champ Pool <span className="available">({availableCount} available of {champions.length})</span></h1>
+          {showSessionLabel && <div className="session-pill">Session: {sessionLabel}</div>}
+        </div>
         <div className="controls">
-          <div style={{marginLeft:8,display:'inline-flex',alignItems:'center',gap:12}}>
-            <div style={{display:'inline-flex',alignItems:'center',gap:8}}>
-              <label className="switch">
-                <input type="checkbox" checked={hideChecked} onChange={e => setHideChecked(e.target.checked)} />
-                <span className="slider" />
-              </label>
-              <span style={{fontSize:13,color:'#94a3b8'}}>Hide checked</span>
-            </div>
+          <div className="control-row">
+            <input
+              className="search-input"
+              type="text"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              placeholder="Search champions"
+              aria-label="Search champions"
+            />
 
-            <div style={{display:'inline-flex',alignItems:'center',gap:8}}>
-              <label className="switch">
-                <input type="checkbox" checked={isLive} onChange={e => openLiveToggleModal(e.target.checked)} />
-                <span className="slider" />
-              </label>
-              <span style={{fontSize:13,color:'#94a3b8'}}>Live Session</span>
-              <span className={`status-dot ${getLiveStatusLabel()}`} aria-label={`Live session status: ${getLiveStatusLabel()}`} />
-            </div>
+            <div className="toggle-row">
+              <div className="toggle-group">
+                <label className="switch">
+                  <input type="checkbox" checked={hideChecked} onChange={e => setHideChecked(e.target.checked)} />
+                  <span className="slider" />
+                </label>
+                <span className="toggle-label">Hide checked</span>
+              </div>
 
-            <button onClick={handleShare} disabled={!isLive} style={{marginLeft:8,opacity: isLive?1:0.5}}>Invite</button>
+              <div className="toggle-group">
+                <label className="switch">
+                  <input type="checkbox" checked={isLive} onChange={e => openLiveToggleModal(e.target.checked)} />
+                  <span className="slider" />
+                </label>
+                <span className="toggle-label">Live Session</span>
+                <span className={`status-dot ${getLiveStatusLabel()}`} aria-label={`Live session status: ${getLiveStatusLabel()}`} />
+              </div>
+
+              <button onClick={handleShare} disabled={!isLive} className="invite-button">Invite</button>
+            </div>
           </div>
         </div>
       </header>
@@ -321,9 +349,12 @@ export default function App() {
       )}
 
       <section className="grid">
-        {champions.filter(c => !hideChecked || !checked.has(c.id)).map(c => (
+        {filteredChampions.map(c => (
           <ChampionCard key={c.id} champ={c} checked={checked.has(c.id)} onToggle={toggle} />
         ))}
+        {!filteredChampions.length && (
+          <div className="empty-state">No champions match your search.</div>
+        )}
       </section>
 
       <aside className="sessions">
