@@ -27,6 +27,7 @@ export default function App() {
   const [liveModalOpen, setLiveModalOpen] = useState(false)
   const [pendingLiveState, setPendingLiveState] = useState(false)
   const [toast, setToast] = useState('')
+  const [liveStatus, setLiveStatus] = useState('offline')
   const availableCount = champions.filter(c => !checked.has(c.id)).length
   const liveChannelRef = useRef(null)
   const sessionQueryIdRef = useRef(null)
@@ -88,6 +89,11 @@ export default function App() {
 
   
 
+  function applyCheckedState(nextList) {
+    const normalized = Array.isArray(nextList) ? nextList : []
+    setChecked(new Set(normalized))
+  }
+
   function toggle(id) {
     const next = new Set(checked)
     if (next.has(id)) next.delete(id)
@@ -146,13 +152,29 @@ export default function App() {
     const channel = supabase.channel(`realtime-sessions-${id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions', filter: `id=eq.${id}` }, (payload) => {
         const record = payload?.new || payload?.record || payload
+        console.log('Realtime payload received', { payload, record })
         try {
           const arr = record?.payload?.checked || []
-          setChecked(new Set(arr))
+          applyCheckedState(arr)
+          setLiveStatus('connected')
         } catch (e) { console.error('failed to apply realtime update', e) }
       })
-    await channel.subscribe()
+
+    channel.subscribe((status, err) => {
+      console.log('Realtime subscription status', { id, status, err })
+      if (status === 'SUBSCRIBED') {
+        setLiveStatus('connected')
+      }
+    })
+
     liveChannelRef.current = channel
+
+    const { data, error } = await supabase.from('sessions').select('payload').eq('id', id).single()
+    if (!error && data?.payload?.checked) {
+      applyCheckedState(data.payload.checked)
+      setLiveStatus('connected')
+    }
+
     return channel
   }
 
@@ -201,7 +223,7 @@ export default function App() {
 
     setLiveSessionId(id)
     setSessionName(data.name || '')
-    if (data.payload?.checked) setChecked(new Set(data.payload.checked))
+    if (data.payload?.checked) applyCheckedState(data.payload.checked)
     return true
   }
 
@@ -242,25 +264,38 @@ export default function App() {
     toastTimeoutRef.current = window.setTimeout(() => setToast(''), 2200)
   }
 
+  function getLiveStatusLabel() {
+    if (!isLive) return 'offline'
+    return liveStatus === 'connecting' ? 'syncing' : 'connected'
+  }
+
   // when toggling live mode, create/join session and subscribe
   useEffect(() => {
     let mounted = true
     if (isLive) {
+      setLiveStatus('connecting')
       ;(async () => {
         const urlSessionId = sessionQueryIdRef.current ? Number(sessionQueryIdRef.current) : null
         if (urlSessionId && !Number.isNaN(urlSessionId)) {
           const loaded = await loadLiveSessionById(urlSessionId)
           if (!mounted) return
-          if (loaded) return
+          if (loaded) {
+            setLiveStatus('connected')
+            return
+          }
         }
 
         if (!liveSessionId) {
           const id = await createLiveSession()
           if (!mounted) return
-          if (id) setLiveSessionId(id)
+          if (id) {
+            setLiveSessionId(id)
+            setLiveStatus('connected')
+          }
         }
       })()
     } else {
+      setLiveStatus('offline')
       if (liveChannelRef.current) {
         try { liveChannelRef.current.unsubscribe() } catch (e) {}
         liveChannelRef.current = null
@@ -277,7 +312,7 @@ export default function App() {
       await subscribeToLiveSession(liveSessionId)
       const { data, error } = await supabase.from('sessions').select('payload').eq('id', liveSessionId).single()
       if (!error && data?.payload?.checked) {
-        setChecked(new Set(data.payload.checked))
+        applyCheckedState(data.payload.checked)
       }
       await updateLiveSession(liveSessionId, checked)
     })()
@@ -310,6 +345,7 @@ export default function App() {
                 <span className="slider" />
               </label>
               <span style={{fontSize:13,color:'#94a3b8'}}>Live Session</span>
+              <span className={`status-dot ${getLiveStatusLabel()}`} aria-label={`Live session status: ${getLiveStatusLabel()}`} />
             </div>
 
             <button onClick={handleShare} disabled={!isLive} style={{marginLeft:8,opacity: isLive?1:0.5}}>Invite</button>
