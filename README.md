@@ -36,6 +36,23 @@ create table if not exists sessions (
 );
 ```
 
+GitHub Pages deployment
+
+This project is set up for static deployment to GitHub Pages.
+
+1. Push to the `main` branch.
+2. In GitHub, open Settings → Secrets and variables → Actions.
+3. Add the following repository secrets:
+
+```bash
+VITE_SUPABASE_URL
+VITE_SUPABASE_ANON_KEY
+```
+
+4. Enable GitHub Pages in the repository settings and use the `gh-pages` branch as the deploy source.
+5. The workflow in `.github/workflows/deploy.yml` will build and publish the app automatically.
+
 Notes
 - The app fetches champion data from Riot Data Dragon at runtime.
 - Sessions store the list of checked champion ids in the `payload` JSON.
+- The app is designed as a frontend app backed by Supabase, so it works well with static hosting.
