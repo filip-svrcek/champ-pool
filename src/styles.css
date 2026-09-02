@@ -35,6 +35,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:16px}
 .modal-actions button{padding:10px 14px;border-radius:8px;border:0;cursor:pointer;font-weight:600}
 .modal-actions .secondary{background:#1e293b;color:#e2e8f0}
 .modal-actions .primary{background:#10b981;color:#042f2e}
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#111827;border:1px solid #334155;color:#f8fafc;padding:10px 16px;border-radius:999px;box-shadow:0 12px 24px rgba(15,23,42,0.35);z-index:30;white-space:nowrap}
 .sessions{margin-top:20px}
 .sessions ul{list-style:none;padding:0}
 .sessions li{margin-bottom:6px}

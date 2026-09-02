@@ -26,9 +26,11 @@ export default function App() {
   const [sessionName, setSessionName] = useState('')
   const [liveModalOpen, setLiveModalOpen] = useState(false)
   const [pendingLiveState, setPendingLiveState] = useState(false)
+  const [toast, setToast] = useState('')
   const availableCount = champions.filter(c => !checked.has(c.id)).length
   const liveChannelRef = useRef(null)
   const sessionQueryIdRef = useRef(null)
+  const toastTimeoutRef = useRef(null)
 
   useEffect(() => {
     let mounted = true
@@ -164,14 +166,21 @@ export default function App() {
     try {
       if (navigator.share) {
         await navigator.share({ title: 'Champ Pool Live Session', url })
+        showToast('Invite ready')
       } else if (navigator.clipboard) {
         await navigator.clipboard.writeText(url)
-        alert('Share URL copied to clipboard')
+        showToast('Invite link copied')
       } else {
-        prompt('Copy this share URL', url)
+        prompt('Copy this invite link', url)
+        showToast('Invite link ready')
       }
     } catch (e) {
-      try { await navigator.clipboard.writeText(url); alert('Share URL copied to clipboard') } catch { alert('Unable to share') }
+      try {
+        await navigator.clipboard.writeText(url)
+        showToast('Invite link copied')
+      } catch {
+        showToast('Unable to copy invite')
+      }
     }
   }
 
@@ -225,6 +234,12 @@ export default function App() {
   function cancelLiveToggle() {
     setLiveModalOpen(false)
     setPendingLiveState(false)
+  }
+
+  function showToast(message) {
+    setToast(message)
+    if (toastTimeoutRef.current) window.clearTimeout(toastTimeoutRef.current)
+    toastTimeoutRef.current = window.setTimeout(() => setToast(''), 2200)
   }
 
   // when toggling live mode, create/join session and subscribe
@@ -297,10 +312,12 @@ export default function App() {
               <span style={{fontSize:13,color:'#94a3b8'}}>Live Session</span>
             </div>
 
-            <button onClick={handleShare} disabled={!isLive} style={{marginLeft:8,opacity: isLive?1:0.5}}>Share</button>
+            <button onClick={handleShare} disabled={!isLive} style={{marginLeft:8,opacity: isLive?1:0.5}}>Invite</button>
           </div>
         </div>
       </header>
+
+      {toast && <div className="toast">{toast}</div>}
 
       {liveModalOpen && (
         <div className="modal-backdrop" onClick={cancelLiveToggle}>
