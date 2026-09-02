@@ -23,8 +23,12 @@ export default function App() {
   const [isLive, setIsLive] = useState(false)
   const [hydrated, setHydrated] = useState(false)
   const [liveSessionId, setLiveSessionId] = useState(null)
+  const [sessionName, setSessionName] = useState('')
+  const [liveModalOpen, setLiveModalOpen] = useState(false)
+  const [pendingLiveState, setPendingLiveState] = useState(false)
   const availableCount = champions.filter(c => !checked.has(c.id)).length
   const liveChannelRef = useRef(null)
+  const sessionQueryIdRef = useRef(null)
 
   useEffect(() => {
     let mounted = true
@@ -58,6 +62,18 @@ export default function App() {
     } catch (e) {
       console.error('localStorage read failed', e)
     }
+
+    const search = new URLSearchParams(window.location.search)
+    const sessionQueryId = search.get('session')
+    if (sessionQueryId) {
+      sessionQueryIdRef.current = sessionQueryId
+      const id = Number(sessionQueryId)
+      if (!Number.isNaN(id)) {
+        setLiveSessionId(id)
+        setIsLive(true)
+      }
+    }
+
     // mark hydration complete so autosave doesn't clobber loaded state
     setHydrated(true)
   }, [])
@@ -93,8 +109,17 @@ export default function App() {
   // create a live session row
   async function createLiveSession() {
     const payload = { checked: Array.from(checked) }
-    const name = `Live ${new Date().toLocaleString()}`
-    const { data, error } = await supabase.from('sessions').insert([{ name, payload }]).select().single()
+    const name = sessionName.trim() || `Live ${new Date().toLocaleString()}`
+    // include owner if authenticated (otherwise null) to match RLS policies
+    const owner = null
+    // // reserved for future auth-backed ownership
+    // try {
+    //   const userRes = await supabase.auth.getUser()
+    //   owner = userRes?.data?.user?.id ?? null
+    // } catch (e) {
+    //   // ignore -- unauthenticated
+    // }
+    const { data, error } = await supabase.from('sessions').insert([{ name, payload, owner }]).select().single()
     if (error) {
       console.error('createLiveSession error', error)
       alert('Failed to create live session: ' + error.message)
@@ -131,7 +156,10 @@ export default function App() {
 
   async function handleShare() {
     if (!isLive) return
-    const sessionPart = liveSessionId ? `?session=${liveSessionId}` : `#live=${encodeURIComponent(JSON.stringify(Array.from(checked)))}`
+    const targetSessionId = liveSessionId ?? await createLiveSession()
+    if (!targetSessionId) return
+    setLiveSessionId(targetSessionId)
+    const sessionPart = `?session=${targetSessionId}`
     const url = `${window.location.origin}${window.location.pathname}${sessionPart}`
     try {
       if (navigator.share) {
@@ -145,6 +173,27 @@ export default function App() {
     } catch (e) {
       try { await navigator.clipboard.writeText(url); alert('Share URL copied to clipboard') } catch { alert('Unable to share') }
     }
+  }
+
+  async function loadLiveSessionById(sessionId) {
+    const id = Number(sessionId)
+    if (!sessionId || Number.isNaN(id)) return false
+
+    const { data, error } = await supabase
+      .from('sessions')
+      .select('id, name, payload')
+      .eq('id', id)
+      .single()
+
+    if (error || !data) {
+      console.error('Failed to load live session', error)
+      return false
+    }
+
+    setLiveSessionId(id)
+    setSessionName(data.name || '')
+    if (data.payload?.checked) setChecked(new Set(data.payload.checked))
+    return true
   }
 
   async function fetchSessions() {
@@ -162,11 +211,34 @@ export default function App() {
     }
   }
 
+  function openLiveToggleModal(nextValue) {
+    if (nextValue === isLive) return
+    setPendingLiveState(nextValue)
+    setLiveModalOpen(true)
+  }
+
+  function confirmLiveToggle() {
+    setIsLive(pendingLiveState)
+    setLiveModalOpen(false)
+  }
+
+  function cancelLiveToggle() {
+    setLiveModalOpen(false)
+    setPendingLiveState(false)
+  }
+
   // when toggling live mode, create/join session and subscribe
   useEffect(() => {
     let mounted = true
     if (isLive) {
       ;(async () => {
+        const urlSessionId = sessionQueryIdRef.current ? Number(sessionQueryIdRef.current) : null
+        if (urlSessionId && !Number.isNaN(urlSessionId)) {
+          const loaded = await loadLiveSessionById(urlSessionId)
+          if (!mounted) return
+          if (loaded) return
+        }
+
         if (!liveSessionId) {
           const id = await createLiveSession()
           if (!mounted) return
@@ -181,13 +253,17 @@ export default function App() {
       setLiveSessionId(null)
     }
     return () => { mounted = false }
-  }, [isLive])
+  }, [isLive, liveSessionId])
 
   useEffect(() => {
     if (!liveSessionId) return
     let mounted = true
     ;(async () => {
       await subscribeToLiveSession(liveSessionId)
+      const { data, error } = await supabase.from('sessions').select('payload').eq('id', liveSessionId).single()
+      if (!error && data?.payload?.checked) {
+        setChecked(new Set(data.payload.checked))
+      }
       await updateLiveSession(liveSessionId, checked)
     })()
     return () => {
@@ -205,7 +281,7 @@ export default function App() {
         <h1>Champ Pool <span className="available">({availableCount} available of {champions.length})</span></h1>
         <div className="controls">
           <div style={{marginLeft:8,display:'inline-flex',alignItems:'center',gap:12}}>
-            <div style={{display:'inline-flex',alignItems:'center',gap:8,alignItems:'center'}}>
+            <div style={{display:'inline-flex',alignItems:'center',gap:8}}>
               <label className="switch">
                 <input type="checkbox" checked={hideChecked} onChange={e => setHideChecked(e.target.checked)} />
                 <span className="slider" />
@@ -215,7 +291,7 @@ export default function App() {
 
             <div style={{display:'inline-flex',alignItems:'center',gap:8}}>
               <label className="switch">
-                <input type="checkbox" checked={isLive} onChange={e => setIsLive(e.target.checked)} />
+                <input type="checkbox" checked={isLive} onChange={e => openLiveToggleModal(e.target.checked)} />
                 <span className="slider" />
               </label>
               <span style={{fontSize:13,color:'#94a3b8'}}>Live Session</span>
@@ -225,6 +301,38 @@ export default function App() {
           </div>
         </div>
       </header>
+
+      {liveModalOpen && (
+        <div className="modal-backdrop" onClick={cancelLiveToggle}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h3>{pendingLiveState ? 'Start live session?' : 'Stop live session?'}</h3>
+            <p>
+              {pendingLiveState
+                ? 'Turning on live mode creates a shareable session that updates in real time for anyone using the same link.'
+                : 'Turning off live mode stops syncing this session to the shared room. Your checked list will stay local on this device.'}
+            </p>
+
+            {pendingLiveState && (
+              <label className="modal-field">
+                <span>Session name</span>
+                <input
+                  type="text"
+                  value={sessionName}
+                  onChange={e => setSessionName(e.target.value)}
+                  placeholder="Friends draft night"
+                />
+              </label>
+            )}
+
+            <div className="modal-actions">
+              <button className="secondary" onClick={cancelLiveToggle}>Cancel</button>
+              <button className="primary" onClick={confirmLiveToggle}>
+                {pendingLiveState ? 'Start live session' : 'Stop live session'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <section className="grid">
         {champions.filter(c => !hideChecked || !checked.has(c.id)).map(c => (

@@ -25,6 +25,16 @@ header{display:flex;align-items:center;justify-content:space-between;gap:16px}
 .card .name{margin-top:8px;font-size:12px}
 .card input{position:relative;margin-bottom:6px}
 .card.checked{opacity:0.45;filter:grayscale(0.6) sepia(0.2);border-color:#ef4444}
+.modal-backdrop{position:fixed;inset:0;background:rgba(2,6,23,0.7);display:flex;align-items:center;justify-content:center;padding:20px;z-index:20}
+.modal{width:min(420px,100%);background:#0f172a;border:1px solid #1f2d3d;border-radius:12px;padding:20px;box-shadow:0 20px 40px rgba(15,23,42,0.45)}
+.modal h3{margin:0 0 12px;font-size:1.2rem}
+.modal p{margin:0 0 16px;color:#cbd5e1;line-height:1.5}
+.modal-field{display:flex;flex-direction:column;gap:8px;margin-bottom:16px;color:#e2e8f0}
+.modal-field input{padding:10px 12px;border-radius:8px;border:1px solid #334155;background:#020817;color:#fff}
+.modal-actions{display:flex;justify-content:flex-end;gap:10px}
+.modal-actions button{padding:10px 14px;border-radius:8px;border:0;cursor:pointer;font-weight:600}
+.modal-actions .secondary{background:#1e293b;color:#e2e8f0}
+.modal-actions .primary{background:#10b981;color:#042f2e}
 .sessions{margin-top:20px}
 .sessions ul{list-style:none;padding:0}
 .sessions li{margin-bottom:6px}
