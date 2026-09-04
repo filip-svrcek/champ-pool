@@ -6,17 +6,14 @@ import { fetchChampionList } from './lib/championData'
 import {
   createLiveSession,
   fetchSessions,
-  loadLiveSessionById,
+  loadLiveSessionBySlug,
   updateLiveSession,
 } from './lib/liveSession'
 import { supabase } from './supabaseClient'
 
-function getUrlSessionId() {
+function getUrlSessionSlug() {
   const search = new URLSearchParams(window.location.search)
-  const sessionQueryId = search.get('session')
-  if (!sessionQueryId) return null
-  const id = Number(sessionQueryId)
-  return Number.isNaN(id) ? null : id
+  return search.get('session') || null
 }
 
 export default function App() {
@@ -24,9 +21,9 @@ export default function App() {
   const [checked, setChecked] = useState(new Set())
   const [sessions, setSessions] = useState([])
   const [hideChecked, setHideChecked] = useState(false)
-  const [isLive, setIsLive] = useState(() => getUrlSessionId() !== null)
+  const [isLive, setIsLive] = useState(() => getUrlSessionSlug() !== null)
   const [hydrated, setHydrated] = useState(false)
-  const [liveSessionId, setLiveSessionId] = useState(getUrlSessionId)
+  const [liveSessionSlug, setLiveSessionSlug] = useState(getUrlSessionSlug)
   const [sessionName, setSessionName] = useState('')
   const [liveModalOpen, setLiveModalOpen] = useState(false)
   const [pendingLiveState, setPendingLiveState] = useState(false)
@@ -35,7 +32,7 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('')
   const availableCount = champions.filter(c => !checked.has(c.id)).length
   const liveChannelRef = useRef(null)
-  const sessionQueryIdRef = useRef(getUrlSessionId())
+  const sessionQuerySlugRef = useRef(getUrlSessionSlug())
   const toastTimeoutRef = useRef(null)
 
   useEffect(() => {
@@ -86,8 +83,8 @@ export default function App() {
     else next.add(id)
     setChecked(next)
     // if live, push update
-    if (isLive && liveSessionId) {
-      updateLiveSession(liveSessionId, next)
+    if (isLive && liveSessionSlug) {
+      updateLiveSession(liveSessionSlug, next)
     }
   }
 
@@ -105,8 +102,8 @@ export default function App() {
 
   async function createSessionRoom() {
     try {
-      const id = await createLiveSession({ checked, sessionName })
-      return id
+      const slug = await createLiveSession({ checked, sessionName })
+      return slug
     } catch (error) {
       console.error('Failed to create live session', error)
       alert('Failed to create live session: ' + error.message)
@@ -114,14 +111,14 @@ export default function App() {
     }
   }
 
-  async function subscribeToLiveSession(id) {
-    if (!id) return
+  async function subscribeToLiveSession(slug) {
+    if (!slug) return
     if (liveChannelRef.current) {
       try { await liveChannelRef.current.unsubscribe() } catch (e) { }
       liveChannelRef.current = null
     }
-    const channel = supabase.channel(`realtime-sessions-${id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions', filter: `id=eq.${id}` }, (payload) => {
+    const channel = supabase.channel(`realtime-sessions-${slug}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions', filter: `slug=eq.${slug}` }, (payload) => {
         const record = payload?.new || payload?.record || payload
         try {
           const arr = record?.payload?.checked || []
@@ -138,7 +135,7 @@ export default function App() {
 
     liveChannelRef.current = channel
 
-    const { data, error } = await supabase.from('sessions').select('payload').eq('id', id).single()
+    const { data, error } = await supabase.from('sessions').select('payload').eq('slug', slug).single()
     if (!error && data?.payload?.checked) {
       applyCheckedState(data.payload.checked)
       setLiveStatus('connected')
@@ -151,10 +148,10 @@ export default function App() {
 
   async function handleShare() {
     if (!isLive) return
-    const targetSessionId = liveSessionId ?? await createSessionRoom()
-    if (!targetSessionId) return
-    setLiveSessionId(targetSessionId)
-    const sessionPart = `?session=${targetSessionId}`
+    const targetSessionSlug = liveSessionSlug ?? await createSessionRoom()
+    if (!targetSessionSlug) return
+    setLiveSessionSlug(targetSessionSlug)
+    const sessionPart = `?session=${targetSessionSlug}`
     const url = `${window.location.origin}${window.location.pathname}${sessionPart}`
     try {
       if (navigator.share) {
@@ -177,11 +174,11 @@ export default function App() {
     }
   }
 
-  async function loadJoinedSession(sessionId) {
-    const data = await loadLiveSessionById(sessionId)
+  async function loadJoinedSession(sessionSlug) {
+    const data = await loadLiveSessionBySlug(sessionSlug)
     if (!data) return false
 
-    setLiveSessionId(Number(sessionId))
+    setLiveSessionSlug(sessionSlug)
     setSessionName(data.name || '')
     if (data.payload?.checked) applyCheckedState(data.payload.checked)
     return true
@@ -247,26 +244,26 @@ export default function App() {
     if (isLive) {
       setLiveStatus('connecting')
       ;(async () => {
-        const urlSessionId = sessionQueryIdRef.current ? Number(sessionQueryIdRef.current) : null
-        if (urlSessionId && !Number.isNaN(urlSessionId)) {
-          const loaded = await loadJoinedSession(urlSessionId)
+        const urlSessionSlug = sessionQuerySlugRef.current
+        if (urlSessionSlug) {
+          const loaded = await loadJoinedSession(urlSessionSlug)
           if (!mounted) return
           if (loaded) {
             setLiveStatus('connected')
             return
           }
-          // If the URL session id exists but failed to load, do NOT auto-create a new session.
+          // If the URL session slug exists but failed to load, do NOT auto-create a new session.
           // This avoids creating duplicates when the intent was to join a specific room.
           setLiveStatus('offline')
           setIsLive(false)
           return
         }
 
-        if (!liveSessionId) {
-          const id = await createSessionRoom()
+        if (!liveSessionSlug) {
+          const slug = await createSessionRoom()
           if (!mounted) return
-          if (id) {
-            setLiveSessionId(id)
+          if (slug) {
+            setLiveSessionSlug(slug)
             setLiveStatus('connected')
           }
         }
@@ -277,17 +274,17 @@ export default function App() {
         try { liveChannelRef.current.unsubscribe() } catch (e) {}
         liveChannelRef.current = null
       }
-      setLiveSessionId(null)
-      sessionQueryIdRef.current = null
+      setLiveSessionSlug(null)
+      sessionQuerySlugRef.current = null
     }
     return () => { mounted = false }
-  }, [isLive, liveSessionId])
+  }, [isLive, liveSessionSlug])
 
   useEffect(() => {
-    if (!liveSessionId) return
+    if (!liveSessionSlug) return
     let mounted = true
     ;(async () => {
-      await subscribeToLiveSession(liveSessionId)
+      await subscribeToLiveSession(liveSessionSlug)
     })()
     return () => {
       mounted = false
@@ -296,7 +293,7 @@ export default function App() {
         liveChannelRef.current = null
       }
     }
-  }, [liveSessionId])
+  }, [liveSessionSlug])
 
   return (
     <div className="app">

@@ -16,29 +16,28 @@ export async function createLiveSession({ checked, sessionName }) {
     throw error
   }
 
-  return data?.id ?? null
+  return data?.slug ?? null
 }
 
-export async function updateLiveSession(id, checkedSet) {
-  if (!id) return
+export async function updateLiveSession(slug, checkedSet) {
+  if (!slug) return
   const payload = { checked: Array.from(checkedSet) }
   const { error } = await supabase
     .from('sessions')
     .update({ payload })
-    .eq('id', id)
+    .eq('slug', slug)
 
   if (error) {
     console.error('updateLiveSession error', error)
   }
 }
 
-export async function loadLiveSessionById(sessionId) {
-  const id = Number(sessionId)
-  if (!sessionId || Number.isNaN(id)) return null
+export async function loadLiveSessionBySlug(slug) {
+  if (!slug) return null
   const { data, error } = await supabase
     .from('sessions')
-    .select('id, name, payload')
-    .eq('id', id)
+    .select('id, slug, name, payload')
+    .eq('slug', slug)
     .single()
 
   if (error || !data) {
