@@ -11,14 +11,22 @@ import {
 } from './lib/liveSession'
 import { supabase } from './supabaseClient'
 
+function getUrlSessionId() {
+  const search = new URLSearchParams(window.location.search)
+  const sessionQueryId = search.get('session')
+  if (!sessionQueryId) return null
+  const id = Number(sessionQueryId)
+  return Number.isNaN(id) ? null : id
+}
+
 export default function App() {
   const [champions, setChampions] = useState([])
   const [checked, setChecked] = useState(new Set())
   const [sessions, setSessions] = useState([])
   const [hideChecked, setHideChecked] = useState(false)
-  const [isLive, setIsLive] = useState(false)
+  const [isLive, setIsLive] = useState(() => getUrlSessionId() !== null)
   const [hydrated, setHydrated] = useState(false)
-  const [liveSessionId, setLiveSessionId] = useState(null)
+  const [liveSessionId, setLiveSessionId] = useState(getUrlSessionId)
   const [sessionName, setSessionName] = useState('')
   const [liveModalOpen, setLiveModalOpen] = useState(false)
   const [pendingLiveState, setPendingLiveState] = useState(false)
@@ -27,7 +35,7 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('')
   const availableCount = champions.filter(c => !checked.has(c.id)).length
   const liveChannelRef = useRef(null)
-  const sessionQueryIdRef = useRef(null)
+  const sessionQueryIdRef = useRef(getUrlSessionId())
   const toastTimeoutRef = useRef(null)
 
   useEffect(() => {
@@ -53,17 +61,6 @@ export default function App() {
       console.error('localStorage read failed', e)
     }
 
-    const search = new URLSearchParams(window.location.search)
-    const sessionQueryId = search.get('session')
-    if (sessionQueryId) {
-      sessionQueryIdRef.current = sessionQueryId
-      const id = Number(sessionQueryId)
-      if (!Number.isNaN(id)) {
-        setLiveSessionId(id)
-        setIsLive(true)
-      }
-    }
-
     // mark hydration complete so autosave doesn't clobber loaded state
     setHydrated(true)
   }, [])
@@ -71,10 +68,12 @@ export default function App() {
   useEffect(() => {
     if (isLive || !hydrated) return
     const payload = { checked: Array.from(checked), updated_at: new Date().toISOString() }
-    try { localStorage.setItem('champ-pool.current', JSON.stringify(payload)) } catch (e) { console.error(e) }
+    try {
+      localStorage.setItem('champ-pool.current', JSON.stringify(payload))
+    } catch (e) { console.error(e) }
   }, [checked, isLive, hydrated])
 
-  
+
 
   function applyCheckedState(nextList) {
     const normalized = Array.isArray(nextList) ? nextList : []
@@ -87,7 +86,9 @@ export default function App() {
     else next.add(id)
     setChecked(next)
     // if live, push update
-    if (isLive && liveSessionId) updateLiveSession(liveSessionId, next)
+    if (isLive && liveSessionId) {
+      updateLiveSession(liveSessionId, next)
+    }
   }
 
   async function saveSession() {
@@ -95,6 +96,7 @@ export default function App() {
     const payload = { checked: Array.from(checked) }
     const { data, error } = await supabase.from('sessions').insert([{ name, payload }])
     if (error) {
+      console.error('saveSession failed', error)
       alert('Save failed: ' + error.message)
     } else {
       fetchSessionsList()
@@ -103,8 +105,10 @@ export default function App() {
 
   async function createSessionRoom() {
     try {
-      return await createLiveSession({ checked, sessionName })
+      const id = await createLiveSession({ checked, sessionName })
+      return id
     } catch (error) {
+      console.error('Failed to create live session', error)
       alert('Failed to create live session: ' + error.message)
       return null
     }
@@ -119,7 +123,6 @@ export default function App() {
     const channel = supabase.channel(`realtime-sessions-${id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions', filter: `id=eq.${id}` }, (payload) => {
         const record = payload?.new || payload?.record || payload
-        console.log('Realtime payload received', { payload, record })
         try {
           const arr = record?.payload?.checked || []
           applyCheckedState(arr)
@@ -128,7 +131,6 @@ export default function App() {
       })
 
     channel.subscribe((status, err) => {
-      console.log('Realtime subscription status', { id, status, err })
       if (status === 'SUBSCRIBED') {
         setLiveStatus('connected')
       }
@@ -140,6 +142,8 @@ export default function App() {
     if (!error && data?.payload?.checked) {
       applyCheckedState(data.payload.checked)
       setLiveStatus('connected')
+    } else if (error) {
+      console.error('subscribeToLiveSession: initial fetch error', error)
     }
 
     return channel
@@ -251,6 +255,11 @@ export default function App() {
             setLiveStatus('connected')
             return
           }
+          // If the URL session id exists but failed to load, do NOT auto-create a new session.
+          // This avoids creating duplicates when the intent was to join a specific room.
+          setLiveStatus('offline')
+          setIsLive(false)
+          return
         }
 
         if (!liveSessionId) {
@@ -279,11 +288,6 @@ export default function App() {
     let mounted = true
     ;(async () => {
       await subscribeToLiveSession(liveSessionId)
-      const { data, error } = await supabase.from('sessions').select('payload').eq('id', liveSessionId).single()
-      if (!error && data?.payload?.checked) {
-        applyCheckedState(data.payload.checked)
-      }
-      await updateLiveSession(liveSessionId, checked)
     })()
     return () => {
       mounted = false

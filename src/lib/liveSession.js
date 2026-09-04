@@ -21,7 +21,6 @@ export async function createLiveSession({ checked, sessionName }) {
 
 export async function updateLiveSession(id, checkedSet) {
   if (!id) return
-
   const payload = { checked: Array.from(checkedSet) }
   const { error } = await supabase
     .from('sessions')
@@ -36,7 +35,6 @@ export async function updateLiveSession(id, checkedSet) {
 export async function loadLiveSessionById(sessionId) {
   const id = Number(sessionId)
   if (!sessionId || Number.isNaN(id)) return null
-
   const { data, error } = await supabase
     .from('sessions')
     .select('id, name, payload')
@@ -58,7 +56,7 @@ export async function fetchSessions() {
     .order('created_at', { ascending: false })
 
   if (error) {
-    console.error(error)
+    console.error('fetchSessions error', error)
     return []
   }
 
