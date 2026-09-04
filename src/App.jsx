@@ -25,6 +25,7 @@ export default function App() {
   const [sessionName, setSessionName] = useState('')
   const [liveModalOpen, setLiveModalOpen] = useState(false)
   const [pendingLiveState, setPendingLiveState] = useState(false)
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
   const [toast, setToast] = useState('')
   const [liveStatus, setLiveStatus] = useState('offline')
   const [searchTerm, setSearchTerm] = useState('')
@@ -167,6 +168,31 @@ export default function App() {
     setSessionName(data.name || '')
     if (data.payload?.checked) applyCheckedState(data.payload.checked)
     return true
+  }
+
+  function clearAllChecked() {
+    setChecked(new Set())
+    if (isLive && liveSessionSlug) {
+      updateLiveSession(liveSessionSlug, new Set())
+    }
+    showToast('Cleared all champions')
+  }
+
+  function handleClearAllClick() {
+    if (isLive) {
+      setClearConfirmOpen(true)
+    } else {
+      clearAllChecked()
+    }
+  }
+
+  function confirmClearAll() {
+    clearAllChecked()
+    setClearConfirmOpen(false)
+  }
+
+  function cancelClearAll() {
+    setClearConfirmOpen(false)
   }
 
   function openLiveToggleModal(nextValue) {
@@ -318,6 +344,7 @@ export default function App() {
                 <span className={`status-dot ${getLiveStatusLabel()}`} aria-label={`Live session status: ${getLiveStatusLabel()}`} />
               </div>
 
+              <button onClick={handleClearAllClick} disabled={checked.size === 0} className="clear-button">Clear all</button>
               <button onClick={handleShare} disabled={!isLive} className="invite-button">Invite</button>
             </div>
           </div>
@@ -334,6 +361,19 @@ export default function App() {
           onCancel={cancelLiveToggle}
           onConfirm={confirmLiveToggle}
         />
+      )}
+
+      {clearConfirmOpen && (
+        <div className="modal-backdrop" onClick={cancelClearAll}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h3>Clear all champions?</h3>
+            <p>This clears the shared board for everyone in this live session right now, and can't be undone.</p>
+            <div className="modal-actions">
+              <button className="secondary" onClick={cancelClearAll}>Cancel</button>
+              <button className="primary" onClick={confirmClearAll}>Clear all</button>
+            </div>
+          </div>
+        </div>
       )}
 
       <section className="grid">
