@@ -145,7 +145,7 @@ export default function App() {
         showToast('Invite ready')
       } else if (navigator.clipboard) {
         await navigator.clipboard.writeText(url)
-        showToast('Invite link copied')
+        showToast('Invite link copied, send it to your friends!')
       } else {
         prompt('Copy this invite link', url)
         showToast('Invite link ready')
@@ -153,9 +153,9 @@ export default function App() {
     } catch (e) {
       try {
         await navigator.clipboard.writeText(url)
-        showToast('Invite link copied')
+        showToast('Invite link copied, send it to your friends!')
       } catch {
-        showToast('Unable to copy invite')
+        showToast('Unable to copy invite link, please copy it manually: ' + url)
       }
     }
   }
@@ -233,8 +233,8 @@ export default function App() {
     return matchesSearch && (!hideChecked || !checked.has(champ.id))
   })
 
-  const sessionLabel = sessionName || (isLive ? 'Live session' : 'Local draft')
-  const showSessionLabel = Boolean(sessionName)
+  const sessionLabel = sessionName || 'Live session'
+  const showSessionLabel = isLive && Boolean(sessionName)
 
   // when toggling live mode, create/join session and subscribe
   useEffect(() => {
@@ -310,13 +310,13 @@ export default function App() {
 
   return (
     <div className="app">
-      <header>
-        <div className="title-block">
+      <header className="app-header">
+        <div className="header-top">
           <h1>Champ Pool <span className="available">({availableCount} available of {champions.length})</span></h1>
-          {showSessionLabel && <div className="session-pill">Session: {sessionLabel}</div>}
         </div>
-        <div className="controls">
-          <div className="control-row">
+
+        <div className="control-bar">
+          <div className="control-cluster view-cluster">
             <input
               className="search-input"
               type="text"
@@ -326,27 +326,29 @@ export default function App() {
               aria-label="Search champions"
             />
 
-            <div className="toggle-row">
-              <div className="toggle-group">
-                <label className="switch">
-                  <input type="checkbox" checked={hideChecked} onChange={e => setHideChecked(e.target.checked)} />
-                  <span className="slider" />
-                </label>
-                <span className="toggle-label">Hide checked</span>
-              </div>
-
-              <div className="toggle-group">
-                <label className="switch">
-                  <input type="checkbox" checked={isLive} onChange={e => openLiveToggleModal(e.target.checked)} />
-                  <span className="slider" />
-                </label>
-                <span className="toggle-label">Live Session</span>
-                <span className={`status-dot ${getLiveStatusLabel()}`} aria-label={`Live session status: ${getLiveStatusLabel()}`} />
-              </div>
-
-              <button onClick={handleClearAllClick} disabled={checked.size === 0} className="clear-button">Clear all</button>
-              <button onClick={handleShare} disabled={!isLive} className="invite-button">Invite</button>
+            <div className="control-group">
+              <label className="switch">
+                <input type="checkbox" checked={hideChecked} onChange={e => setHideChecked(e.target.checked)} />
+                <span className="slider" />
+              </label>
+              <span className="toggle-label">Hide checked</span>
             </div>
+
+            <button onClick={handleClearAllClick} disabled={checked.size === 0} className="clear-button">Clear all</button>
+          </div>
+
+          <div className="control-cluster live-cluster">
+            <div className="control-group">
+              <label className="switch">
+                <input type="checkbox" checked={isLive} onChange={e => openLiveToggleModal(e.target.checked)} />
+                <span className="slider" />
+              </label>
+              <span className="toggle-label">Live Session</span>
+              <span className={`status-dot ${getLiveStatusLabel()}`} aria-label={`Live session status: ${getLiveStatusLabel()}`} />
+              {showSessionLabel && <span className="session-pill">{sessionLabel}</span>}
+            </div>
+
+            <button onClick={handleShare} disabled={!isLive} className="invite-button">Invite</button>
           </div>
         </div>
       </header>
