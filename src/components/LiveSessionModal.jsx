@@ -14,7 +14,7 @@ export default function LiveSessionModal({
         <p>
           {pendingLiveState
             ? 'Turning on live mode creates a shareable session that updates in real time for anyone using the same link.'
-            : 'Turning off live mode stops syncing this session to the shared room. Your checked list will stay local on this device.'}
+            : 'Turning off live mode stops syncing changes to the shared session. Your checked list will stay local on this device. YOU WON\'T BE ABLE TO RECONNECT TO THIS SESSION UNLESS YOU HAVE THE LINK.'}
         </p>
 
         {pendingLiveState && (

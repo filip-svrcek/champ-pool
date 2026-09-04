@@ -296,6 +296,20 @@ export default function App() {
     }
   }, [liveSessionSlug])
 
+  // keep the ?session= URL param in sync with the current live session,
+  // so refreshing or copying the address bar resumes the right session
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    if (liveSessionSlug) {
+      url.searchParams.set('session', liveSessionSlug)
+    } else {
+      url.searchParams.delete('session')
+    }
+    if (url.href !== window.location.href) {
+      window.history.replaceState(null, '', url)
+    }
+  }, [liveSessionSlug])
+
   return (
     <div className="app">
       <header>
