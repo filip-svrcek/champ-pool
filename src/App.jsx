@@ -205,6 +205,7 @@ export default function App() {
   }
 
   function confirmLiveToggle() {
+    if (pendingLiveState && !sessionName.trim()) return
     setIsLive(pendingLiveState)
     setLiveModalOpen(false)
   }

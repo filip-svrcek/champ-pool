@@ -5,6 +5,8 @@ export default function LiveSessionModal({
   onCancel,
   onConfirm,
 }) {
+  const nameRequired = pendingLiveState && !sessionName.trim()
+
   return (
     <div className="modal-backdrop" onClick={onCancel}>
       <div className="modal" onClick={e => e.stopPropagation()}>
@@ -23,13 +25,15 @@ export default function LiveSessionModal({
               value={sessionName}
               onChange={e => setSessionName(e.target.value)}
               placeholder="Friends draft night"
+              required
             />
+            {nameRequired && <span className="field-hint">Session name is required.</span>}
           </label>
         )}
 
         <div className="modal-actions">
           <button className="secondary" onClick={onCancel}>Cancel</button>
-          <button className="primary" onClick={onConfirm}>
+          <button className="primary" onClick={onConfirm} disabled={nameRequired}>
             {pendingLiveState ? 'Start live session' : 'Stop live session'}
           </button>
         </div>

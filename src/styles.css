@@ -41,10 +41,12 @@ header{display:flex;align-items:flex-start;justify-content:space-between;gap:16p
 .modal p{margin:0 0 16px;color:#cbd5e1;line-height:1.5}
 .modal-field{display:flex;flex-direction:column;gap:8px;margin-bottom:16px;color:#e2e8f0}
 .modal-field input{padding:10px 12px;border-radius:8px;border:1px solid #334155;background:#020817;color:#fff}
+.field-hint{font-size:0.85rem;color:#f87171}
 .modal-actions{display:flex;justify-content:flex-end;gap:10px}
 .modal-actions button{padding:10px 14px;border-radius:8px;border:0;cursor:pointer;font-weight:600}
 .modal-actions .secondary{background:#1e293b;color:#e2e8f0}
 .modal-actions .primary{background:#10b981;color:#042f2e}
+.modal-actions .primary:disabled{background:#134e4a;color:#64748b;cursor:not-allowed}
 .toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#111827;border:1px solid #334155;color:#f8fafc;padding:10px 16px;border-radius:999px;box-shadow:0 12px 24px rgba(15,23,42,0.35);z-index:30;white-space:nowrap}
 .status-dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#475569;box-shadow:0 0 0 2px rgba(148,163,184,0.15)}
 .status-dot.connected{background:#10b981;box-shadow:0 0 0 2px rgba(16,185,129,0.2)}

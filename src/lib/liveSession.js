@@ -3,11 +3,10 @@ import { supabase } from '../supabaseClient'
 export async function createLiveSession({ checked, sessionName }) {
   const payload = { checked: Array.from(checked) }
   const name = sessionName.trim() || `Live ${new Date().toLocaleString()}`
-  const owner = null
 
   const { data, error } = await supabase
     .from('sessions')
-    .insert([{ name, payload, owner }])
+    .insert([{ name, payload }])
     .select()
     .single()
 
