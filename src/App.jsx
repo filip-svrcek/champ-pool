@@ -5,7 +5,6 @@ import Toast from './components/Toast'
 import { fetchChampionList } from './lib/championData'
 import {
   createLiveSession,
-  fetchSessions,
   loadLiveSessionBySlug,
   updateLiveSession,
 } from './lib/liveSession'
@@ -19,7 +18,6 @@ function getUrlSessionSlug() {
 export default function App() {
   const [champions, setChampions] = useState([])
   const [checked, setChecked] = useState(new Set())
-  const [sessions, setSessions] = useState([])
   const [hideChecked, setHideChecked] = useState(false)
   const [isLive, setIsLive] = useState(() => getUrlSessionSlug() !== null)
   const [hydrated, setHydrated] = useState(false)
@@ -50,7 +48,6 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    fetchSessions()
     try {
       const cur = JSON.parse(localStorage.getItem('champ-pool.current') || 'null')
       if (cur && cur.checked && !isLive) setChecked(new Set(cur.checked))
@@ -85,18 +82,6 @@ export default function App() {
     // if live, push update
     if (isLive && liveSessionSlug) {
       updateLiveSession(liveSessionSlug, next)
-    }
-  }
-
-  async function saveSession() {
-    const name = `Session ${new Date().toLocaleString()}`
-    const payload = { checked: Array.from(checked) }
-    const { data, error } = await supabase.from('sessions').insert([{ name, payload }])
-    if (error) {
-      console.error('saveSession failed', error)
-      alert('Save failed: ' + error.message)
-    } else {
-      fetchSessionsList()
     }
   }
 
@@ -182,20 +167,6 @@ export default function App() {
     setSessionName(data.name || '')
     if (data.payload?.checked) applyCheckedState(data.payload.checked)
     return true
-  }
-
-  async function fetchSessionsList() {
-    const nextSessions = await fetchSessions()
-    setSessions(nextSessions)
-  }
-
-  function loadSession(s) {
-    try {
-      const arr = s.payload?.checked || []
-      setChecked(new Set(arr))
-    } catch (e) {
-      console.error(e)
-    }
   }
 
   function openLiveToggleModal(nextValue) {
@@ -373,17 +344,6 @@ export default function App() {
           <div className="empty-state">No champions match your search.</div>
         )}
       </section>
-
-      <aside className="sessions">
-        <h3>Saved Sessions (Supabase)</h3>
-        <ul>
-          {sessions.map(s => (
-            <li key={s.id}>
-              <button onClick={() => loadSession(s)}>{s.name || s.id}</button>
-            </li>
-          ))}
-        </ul>
-      </aside>
     </div>
   )
 }

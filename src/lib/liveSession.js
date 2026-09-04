@@ -46,17 +46,3 @@ export async function loadLiveSessionBySlug(slug) {
 
   return data
 }
-
-export async function fetchSessions() {
-  const { data, error } = await supabase
-    .from('sessions')
-    .select('*')
-    .order('created_at', { ascending: false })
-
-  if (error) {
-    console.error('fetchSessions error', error)
-    return []
-  }
-
-  return data || []
-}

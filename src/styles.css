@@ -52,7 +52,3 @@ header{display:flex;align-items:flex-start;justify-content:space-between;gap:16p
 .status-dot.connected{background:#10b981;box-shadow:0 0 0 2px rgba(16,185,129,0.2)}
 .status-dot.syncing{background:#f59e0b;box-shadow:0 0 0 2px rgba(245,158,11,0.2)}
 .status-dot.offline{background:#64748b;box-shadow:0 0 0 2px rgba(100,116,139,0.15)}
-.sessions{margin-top:20px}
-.sessions ul{list-style:none;padding:0}
-.sessions li{margin-bottom:6px}
-.sessions button{background:#172033;border:0;color:#fff;padding:6px 8px;border-radius:6px}
