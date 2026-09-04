@@ -197,6 +197,7 @@ export default function App() {
 
   function openLiveToggleModal(nextValue) {
     if (nextValue === isLive) return
+    if (nextValue) setSessionName('')
     setPendingLiveState(nextValue)
     setLiveModalOpen(true)
   }
