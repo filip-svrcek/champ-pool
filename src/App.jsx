@@ -255,6 +255,7 @@ export default function App() {
           }
           // If the URL session slug exists but failed to load, do NOT auto-create a new session.
           // This avoids creating duplicates when the intent was to join a specific room.
+          showToast("Session not found — it may have been deleted")
           setLiveStatus('offline')
           setIsLive(false)
           return
