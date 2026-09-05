@@ -22,6 +22,8 @@ export default function App() {
   const [isLive, setIsLive] = useState(() => getUrlSessionSlug() !== null)
   const [hydrated, setHydrated] = useState(false)
   const [liveSessionSlug, setLiveSessionSlug] = useState(getUrlSessionSlug)
+  const [sessionRole, setSessionRole] = useState('editor')
+  const [viewSlugForSharing, setViewSlugForSharing] = useState(null)
   const [sessionName, setSessionName] = useState('')
   const [liveModalOpen, setLiveModalOpen] = useState(false)
   const [pendingLiveState, setPendingLiveState] = useState(false)
@@ -76,6 +78,7 @@ export default function App() {
   }
 
   function toggle(id) {
+    if (isLive && sessionRole === 'observer') return
     const next = new Set(checked)
     if (next.has(id)) next.delete(id)
     else next.add(id)
@@ -88,8 +91,8 @@ export default function App() {
 
   async function createSessionRoom() {
     try {
-      const slug = await createLiveSession({ checked, sessionName })
-      return slug
+      const created = await createLiveSession({ checked, sessionName })
+      return created
     } catch (error) {
       console.error('Failed to create live session', error)
       alert('Failed to create live session: ' + error.message)
@@ -97,14 +100,15 @@ export default function App() {
     }
   }
 
-  async function subscribeToLiveSession(slug) {
+  async function subscribeToLiveSession(slug, role) {
     if (!slug) return
     if (liveChannelRef.current) {
       try { await liveChannelRef.current.unsubscribe() } catch (e) { }
       liveChannelRef.current = null
     }
+    const column = role === 'observer' ? 'view_slug' : 'slug'
     const channel = supabase.channel(`realtime-sessions-${slug}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions', filter: `slug=eq.${slug}` }, (payload) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions', filter: `${column}=eq.${slug}` }, (payload) => {
         const record = payload?.new || payload?.record || payload
         try {
           const arr = record?.payload?.checked || []
@@ -121,7 +125,7 @@ export default function App() {
 
     liveChannelRef.current = channel
 
-    const { data, error } = await supabase.from('sessions').select('payload').eq('slug', slug).single()
+    const { data, error } = await supabase.from('sessions').select('payload').eq(column, slug).single()
     if (!error && data?.payload?.checked) {
       applyCheckedState(data.payload.checked)
       setLiveStatus('connected')
@@ -132,30 +136,42 @@ export default function App() {
     return channel
   }
 
-  async function handleShare() {
+  async function handleShare(linkType) {
     if (!isLive) return
-    const targetSessionSlug = liveSessionSlug ?? await createSessionRoom()
-    if (!targetSessionSlug) return
-    setLiveSessionSlug(targetSessionSlug)
-    const sessionPart = `?session=${targetSessionSlug}`
+    let editSlug = liveSessionSlug
+    let viewSlug = viewSlugForSharing
+    if (!editSlug) {
+      const created = await createSessionRoom()
+      if (!created) return
+      editSlug = created.slug
+      viewSlug = created.viewSlug
+      setLiveSessionSlug(editSlug)
+      setViewSlugForSharing(viewSlug)
+      setSessionRole('editor')
+    }
+
+    const targetSlug = linkType === 'view' ? viewSlug : editSlug
+    if (!targetSlug) return
+    const label = linkType === 'view' ? 'View-only link' : 'Invite link'
+    const sessionPart = `?session=${targetSlug}`
     const url = `${window.location.origin}${window.location.pathname}${sessionPart}`
     try {
       if (navigator.share) {
         await navigator.share({ title: 'Champ Pool Live Session', url })
-        showToast('Invite ready')
+        showToast(`${label} ready`)
       } else if (navigator.clipboard) {
         await navigator.clipboard.writeText(url)
-        showToast('Invite link copied, send it to your friends!')
+        showToast(`${label} copied, send it to your friends!`)
       } else {
-        prompt('Copy this invite link', url)
-        showToast('Invite link ready')
+        prompt(`Copy this ${label.toLowerCase()}`, url)
+        showToast(`${label} ready`)
       }
     } catch (e) {
       try {
         await navigator.clipboard.writeText(url)
-        showToast('Invite link copied, send it to your friends!')
+        showToast(`${label} copied, send it to your friends!`)
       } catch {
-        showToast('Unable to copy invite link, please copy it manually: ' + url)
+        showToast(`Unable to copy ${label.toLowerCase()}, please copy it manually: ` + url)
       }
     }
   }
@@ -165,12 +181,15 @@ export default function App() {
     if (!data) return false
 
     setLiveSessionSlug(sessionSlug)
+    setSessionRole(data.role)
+    setViewSlugForSharing(data.role === 'editor' ? data.view_slug : null)
     setSessionName(data.name || '')
     if (data.payload?.checked) applyCheckedState(data.payload.checked)
     return true
   }
 
   function clearAllChecked() {
+    if (isLive && sessionRole === 'observer') return
     setChecked(new Set())
     if (isLive && liveSessionSlug) {
       updateLiveSession(liveSessionSlug, new Set())
@@ -260,10 +279,12 @@ export default function App() {
         }
 
         if (!liveSessionSlug) {
-          const slug = await createSessionRoom()
+          const created = await createSessionRoom()
           if (!mounted) return
-          if (slug) {
-            setLiveSessionSlug(slug)
+          if (created) {
+            setLiveSessionSlug(created.slug)
+            setViewSlugForSharing(created.viewSlug)
+            setSessionRole('editor')
             setLiveStatus('connected')
           }
         }
@@ -275,6 +296,8 @@ export default function App() {
         liveChannelRef.current = null
       }
       setLiveSessionSlug(null)
+      setSessionRole('editor')
+      setViewSlugForSharing(null)
       sessionQuerySlugRef.current = null
     }
     return () => { mounted = false }
@@ -284,7 +307,7 @@ export default function App() {
     if (!liveSessionSlug) return
     let mounted = true
     ;(async () => {
-      await subscribeToLiveSession(liveSessionSlug)
+      await subscribeToLiveSession(liveSessionSlug, sessionRole)
     })()
     return () => {
       mounted = false
@@ -293,7 +316,7 @@ export default function App() {
         liveChannelRef.current = null
       }
     }
-  }, [liveSessionSlug])
+  }, [liveSessionSlug, sessionRole])
 
   // keep the ?session= URL param in sync with the current live session,
   // so refreshing or copying the address bar resumes the right session
@@ -335,7 +358,7 @@ export default function App() {
               <span className="toggle-label">Hide checked</span>
             </div>
 
-            <button onClick={handleClearAllClick} disabled={checked.size === 0} className="clear-button">Clear all</button>
+            <button onClick={handleClearAllClick} disabled={checked.size === 0 || (isLive && sessionRole === 'observer')} className="clear-button">Clear all</button>
           </div>
 
           <div className="control-cluster live-cluster">
@@ -347,9 +370,15 @@ export default function App() {
               <span className="toggle-label">Live Session</span>
               <span className={`status-dot ${getLiveStatusLabel()}`} aria-label={`Live session status: ${getLiveStatusLabel()}`} />
               {showSessionLabel && <span className="session-pill">{sessionLabel}</span>}
+              {isLive && sessionRole === 'observer' && <span className="role-badge observer">Observer</span>}
             </div>
 
-            <button onClick={handleShare} disabled={!isLive} className="invite-button">Invite</button>
+            {isLive && sessionRole === 'editor' && (
+              <>
+                <button onClick={() => handleShare('edit')} className="invite-button">Invite</button>
+                <button onClick={() => handleShare('view')} className="invite-secondary">Invite (view only)</button>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -381,7 +410,13 @@ export default function App() {
 
       <section className="grid">
         {filteredChampions.map(c => (
-          <ChampionCard key={c.id} champ={c} checked={checked.has(c.id)} onToggle={toggle} />
+          <ChampionCard
+            key={c.id}
+            champ={c}
+            checked={checked.has(c.id)}
+            onToggle={toggle}
+            disabled={isLive && sessionRole === 'observer'}
+          />
         ))}
         {!filteredChampions.length && (
           <div className="empty-state">No champions match your search.</div>

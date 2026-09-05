@@ -7,7 +7,7 @@ export async function createLiveSession({ checked, sessionName }) {
   const { data, error } = await supabase
     .from('sessions')
     .insert([{ name, payload }])
-    .select()
+    .select('slug, view_slug')
     .single()
 
   if (error) {
@@ -15,7 +15,7 @@ export async function createLiveSession({ checked, sessionName }) {
     throw error
   }
 
-  return data?.slug ?? null
+  return data ? { slug: data.slug, viewSlug: data.view_slug } : null
 }
 
 export async function updateLiveSession(slug, checkedSet) {
@@ -31,18 +31,37 @@ export async function updateLiveSession(slug, checkedSet) {
   }
 }
 
-export async function loadLiveSessionBySlug(slug) {
-  if (!slug) return null
-  const { data, error } = await supabase
-    .from('sessions')
-    .select('id, slug, name, payload')
-    .eq('slug', slug)
-    .single()
+// Looks up a session by either its editor slug or its view-only slug.
+// The view-only lookup deliberately omits the `slug` column from the
+// response so an observer's client never receives the editor slug.
+export async function loadLiveSessionBySlug(value) {
+  if (!value) return null
 
-  if (error || !data) {
-    console.error('Failed to load live session', error)
+  const { data: editorRow, error: editorError } = await supabase
+    .from('sessions')
+    .select('id, slug, view_slug, name, payload')
+    .eq('slug', value)
+    .maybeSingle()
+
+  if (editorError) {
+    console.error('Failed to load live session', editorError)
     return null
   }
+  if (editorRow) {
+    return { ...editorRow, role: 'editor' }
+  }
 
-  return data
+  const { data: viewerRow, error: viewerError } = await supabase
+    .from('sessions')
+    .select('id, view_slug, name, payload')
+    .eq('view_slug', value)
+    .maybeSingle()
+
+  if (viewerError) {
+    console.error('Failed to load live session', viewerError)
+    return null
+  }
+  if (!viewerRow) return null
+
+  return { ...viewerRow, role: 'observer' }
 }
