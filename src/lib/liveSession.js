@@ -1,7 +1,36 @@
 import { supabase } from '../supabaseClient'
 
+// `checked` is a Map<championId, 'picked' | 'banned'>. Persisted payloads
+// store the two types as separate id arrays. `checked` (a flat id array)
+// is also read for backward compatibility with sessions saved before the
+// picked/banned distinction existed - those ids are treated as 'picked'.
+export function payloadToCheckedMap(payload) {
+  const map = new Map()
+  if (!payload) return map
+  if (Array.isArray(payload.checked)) {
+    for (const id of payload.checked) map.set(id, 'picked')
+  }
+  if (Array.isArray(payload.picked)) {
+    for (const id of payload.picked) map.set(id, 'picked')
+  }
+  if (Array.isArray(payload.banned)) {
+    for (const id of payload.banned) map.set(id, 'banned')
+  }
+  return map
+}
+
+export function checkedMapToPayload(checkedMap) {
+  const picked = []
+  const banned = []
+  for (const [id, type] of checkedMap.entries()) {
+    if (type === 'banned') banned.push(id)
+    else picked.push(id)
+  }
+  return { picked, banned }
+}
+
 export async function createLiveSession({ checked, sessionName }) {
-  const payload = { checked: Array.from(checked) }
+  const payload = checkedMapToPayload(checked)
   const name = sessionName.trim() || `Live ${new Date().toLocaleString()}`
 
   const { data, error } = await supabase
@@ -18,9 +47,9 @@ export async function createLiveSession({ checked, sessionName }) {
   return data ? { slug: data.slug, viewSlug: data.view_slug } : null
 }
 
-export async function updateLiveSession(slug, checkedSet) {
+export async function updateLiveSession(slug, checkedMap) {
   if (!slug) return
-  const payload = { checked: Array.from(checkedSet) }
+  const payload = checkedMapToPayload(checkedMap)
   const { error } = await supabase
     .from('sessions')
     .update({ payload })

@@ -4,8 +4,10 @@ import LiveSessionModal from './components/LiveSessionModal'
 import Toast from './components/Toast'
 import { fetchChampionList } from './lib/championData'
 import {
+  checkedMapToPayload,
   createLiveSession,
   loadLiveSessionBySlug,
+  payloadToCheckedMap,
   updateLiveSession,
 } from './lib/liveSession'
 import { supabase } from './supabaseClient'
@@ -17,7 +19,7 @@ function getUrlSessionSlug() {
 
 export default function App() {
   const [champions, setChampions] = useState([])
-  const [checked, setChecked] = useState(new Set())
+  const [checked, setChecked] = useState(new Map())
   const [hideChecked, setHideChecked] = useState(false)
   const [isLive, setIsLive] = useState(() => getUrlSessionSlug() !== null)
   const [hydrated, setHydrated] = useState(false)
@@ -53,7 +55,7 @@ export default function App() {
   useEffect(() => {
     try {
       const cur = JSON.parse(localStorage.getItem('champ-pool.current') || 'null')
-      if (cur && cur.checked && !isLive) setChecked(new Set(cur.checked))
+      if (cur && !isLive) setChecked(payloadToCheckedMap(cur))
     } catch (e) {
       console.error('localStorage read failed', e)
     }
@@ -64,7 +66,7 @@ export default function App() {
   // autosave current non-live state to localStorage
   useEffect(() => {
     if (isLive || !hydrated) return
-    const payload = { checked: Array.from(checked), updated_at: new Date().toISOString() }
+    const payload = { ...checkedMapToPayload(checked), updated_at: new Date().toISOString() }
     try {
       localStorage.setItem('champ-pool.current', JSON.stringify(payload))
     } catch (e) { console.error(e) }
@@ -72,18 +74,20 @@ export default function App() {
 
 
 
-  function applyCheckedState(nextList) {
-    const normalized = Array.isArray(nextList) ? nextList : []
-    setChecked(new Set(normalized))
+  function applyCheckedState(payload) {
+    setChecked(payloadToCheckedMap(payload))
   }
 
-  function toggle(id) {
+  function setChampionType(id, type) {
     if (isLive && sessionRole === 'observer') return
-    const next = new Set(checked)
-    if (next.has(id)) next.delete(id)
-    else next.add(id)
+    const next = new Map(checked)
+    if (checked.get(id) === type) {
+      // clicking the already-active option clears it back to available
+      next.delete(id)
+    } else {
+      next.set(id, type)
+    }
     setChecked(next)
-    // if live, push update
     if (isLive && liveSessionSlug) {
       updateLiveSession(liveSessionSlug, next)
     }
@@ -111,8 +115,7 @@ export default function App() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions', filter: `${column}=eq.${slug}` }, (payload) => {
         const record = payload?.new || payload?.record || payload
         try {
-          const arr = record?.payload?.checked || []
-          applyCheckedState(arr)
+          applyCheckedState(record?.payload)
           setLiveStatus('connected')
         } catch (e) { console.error('failed to apply realtime update', e) }
       })
@@ -126,8 +129,8 @@ export default function App() {
     liveChannelRef.current = channel
 
     const { data, error } = await supabase.from('sessions').select('payload').eq(column, slug).single()
-    if (!error && data?.payload?.checked) {
-      applyCheckedState(data.payload.checked)
+    if (!error && data?.payload) {
+      applyCheckedState(data.payload)
       setLiveStatus('connected')
     } else if (error) {
       console.error('subscribeToLiveSession: initial fetch error', error)
@@ -184,15 +187,15 @@ export default function App() {
     setSessionRole(data.role)
     setViewSlugForSharing(data.role === 'editor' ? data.view_slug : null)
     setSessionName(data.name || '')
-    if (data.payload?.checked) applyCheckedState(data.payload.checked)
+    if (data.payload) applyCheckedState(data.payload)
     return true
   }
 
   function clearAllChecked() {
     if (isLive && sessionRole === 'observer') return
-    setChecked(new Set())
+    setChecked(new Map())
     if (isLive && liveSessionSlug) {
-      updateLiveSession(liveSessionSlug, new Set())
+      updateLiveSession(liveSessionSlug, new Map())
     }
     showToast('Cleared all champions')
   }
@@ -413,8 +416,8 @@ export default function App() {
           <ChampionCard
             key={c.id}
             champ={c}
-            checked={checked.has(c.id)}
-            onToggle={toggle}
+            status={checked.get(c.id)}
+            onSetType={setChampionType}
             disabled={isLive && sessionRole === 'observer'}
           />
         ))}

@@ -46,12 +46,20 @@ h1{margin:0}
 .switch input:checked + .slider:before{transform:translateX(20px)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px;margin-top:16px}
 .empty-state{grid-column:1 / -1;padding:16px;border:1px dashed #334155;border-radius:8px;color:#cbd5e1;background:rgba(15,23,42,0.35);text-align:center}
-.card{display:flex;flex-direction:column;align-items:center;padding:8px;border-radius:8px;background:var(--card);text-align:center;color:#fff;cursor:pointer;border:2px solid #10b981;transition:all 150ms ease}
+.card{display:flex;flex-direction:column;align-items:center;padding:8px;border-radius:8px;background:var(--card);text-align:center;color:#fff;border:2px solid #10b981;transition:all 150ms ease;overflow:hidden}
+.card-toggle{display:flex;flex-direction:column;align-items:center;cursor:default;width:100%}
 .card img{width:72px;height:72px;object-fit:contain}
 .card .name{margin-top:8px;font-size:12px}
 .card input{position:relative;margin-bottom:6px}
-.card.checked{opacity:0.45;filter:grayscale(0.6) sepia(0.2);border-color:#ef4444}
-.card.disabled{cursor:default}
+.card.picked{opacity:0.6;filter:grayscale(0.3);border-color:#3b82f6}
+.card.banned{opacity:0.45;filter:grayscale(0.6) sepia(0.2);border-color:#ef4444}
+.type-slider{display:flex;width:calc(100% + 16px);margin:8px -8px -8px -8px;border-top:1px solid #263143}
+.type-option{flex:1;padding:11px 4px;border:0;background:#0b1220;color:#94a3b8;cursor:pointer;font-weight:700;font-size:12px;transition:all 120ms ease}
+.type-option:first-child{border-right:1px solid #263143}
+.type-option:hover:not(:disabled){color:#e2e8f0}
+.type-option:disabled{cursor:not-allowed;opacity:0.5}
+.type-option.picked-option.active{background:#3b82f6;color:#04101f}
+.type-option.banned-option.active{background:#ef4444;color:#2a0a0a}
 .modal-backdrop{position:fixed;inset:0;background:rgba(2,6,23,0.7);display:flex;align-items:center;justify-content:center;padding:20px;z-index:20}
 .modal{width:min(420px,100%);background:#0f172a;border:1px solid #1f2d3d;border-radius:12px;padding:20px;box-shadow:0 20px 40px rgba(15,23,42,0.45)}
 .modal h3{margin:0 0 12px;font-size:1.2rem}
