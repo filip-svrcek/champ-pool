@@ -17,13 +17,13 @@ h1{margin:0}
 .live-cluster{flex:0 0 auto;margin-left:auto}
 .control-group{display:inline-flex;align-items:center;gap:8px}
 .toggle-label{font-size:13px;color:#94a3b8}
-.control-cluster button{padding:8px 12px;border-radius:6px;border:0;background:var(--accent);color:#012;cursor:pointer;font-weight:600}
-.invite-button{opacity:1}
+.control-cluster button{padding:8px 12px;border-radius:6px;border:0;cursor:pointer;font-weight:600}
+.invite-button{background:var(--accent);color:#012}
 .invite-button:disabled{opacity:0.5;cursor:not-allowed}
 .clear-button{background:#1e293b;color:#e2e8f0}
 .clear-button:disabled{opacity:0.5;cursor:not-allowed}
-.invite-secondary{background:#1e293b;color:#e2e8f0}
-.invite-secondary:disabled{opacity:0.5;cursor:not-allowed}
+.filter-button{display:inline-flex;align-items:center;gap:6px;background:#1e293b;color:#e2e8f0}
+.filter-icon{flex-shrink:0}
 .available{margin-left:8px;font-size:13px;color:var(--accent);background:rgba(96,165,250,0.06);padding:4px 8px;border-radius:999px;border:1px solid rgba(96,165,250,0.12)}
 .session-pill{display:inline-flex;align-items:center;width:fit-content;padding:4px 10px;border-radius:999px;background:rgba(96,165,250,0.08);border:1px solid rgba(96,165,250,0.18);color:#dfeaff;font-size:12px;font-weight:600}
 .role-badge{display:inline-flex;align-items:center;width:fit-content;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600}
@@ -67,6 +67,9 @@ h1{margin:0}
 .modal-field{display:flex;flex-direction:column;gap:8px;margin-bottom:16px;color:#e2e8f0}
 .modal-field input{padding:10px 12px;border-radius:8px;border:1px solid #334155;background:#020817;color:#fff}
 .field-hint{font-size:0.85rem;color:#f87171}
+.filter-options{display:flex;flex-direction:column;gap:12px;margin-bottom:16px}
+.filter-option{display:flex;align-items:center;gap:10px;color:#e2e8f0;cursor:pointer;font-weight:600}
+.filter-option input{width:16px;height:16px;cursor:pointer}
 .modal-actions{display:flex;justify-content:flex-end;gap:10px}
 .modal-actions button{padding:10px 14px;border-radius:8px;border:0;cursor:pointer;font-weight:600}
 .modal-actions .secondary{background:#1e293b;color:#e2e8f0}

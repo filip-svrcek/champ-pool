@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react'
 import ChampionCard from './components/ChampionCard'
+import FilterModal from './components/FilterModal'
 import LiveSessionModal from './components/LiveSessionModal'
 import Toast from './components/Toast'
 import { fetchChampionList } from './lib/championData'
@@ -20,7 +21,8 @@ function getUrlSessionSlug() {
 export default function App() {
   const [champions, setChampions] = useState([])
   const [checked, setChecked] = useState(new Map())
-  const [hideChecked, setHideChecked] = useState(false)
+  const [visibleStatuses, setVisibleStatuses] = useState({ available: true, picked: true, banned: true })
+  const [filterModalOpen, setFilterModalOpen] = useState(false)
   const [isLive, setIsLive] = useState(() => getUrlSessionSlug() !== null)
   const [hydrated, setHydrated] = useState(false)
   const [liveSessionSlug, setLiveSessionSlug] = useState(getUrlSessionSlug)
@@ -235,6 +237,10 @@ export default function App() {
     setPendingLiveState(false)
   }
 
+  function toggleVisibleStatus(key) {
+    setVisibleStatuses(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
   function showToast(message) {
     setToast(message)
     if (toastTimeoutRef.current) window.clearTimeout(toastTimeoutRef.current)
@@ -247,13 +253,16 @@ export default function App() {
   }
 
   const normalizedSearch = searchTerm.trim().toLowerCase()
+  const hiddenStatusCount = Object.values(visibleStatuses).filter(v => !v).length
+  const isFilterActive = hiddenStatusCount > 0
   const filteredChampions = champions.filter((champ) => {
     const matchesSearch = !normalizedSearch ||
       champ.name.toLowerCase().includes(normalizedSearch) ||
       (champ.title && champ.title.toLowerCase().includes(normalizedSearch)) ||
       String(champ.id).includes(normalizedSearch)
 
-    return matchesSearch && (!hideChecked || !checked.has(champ.id))
+    const category = checked.get(champ.id) || 'available'
+    return matchesSearch && visibleStatuses[category]
   })
 
   const sessionLabel = sessionName || 'Live session'
@@ -353,13 +362,27 @@ export default function App() {
               aria-label="Search champions"
             />
 
-            <div className="control-group">
-              <label className="switch">
-                <input type="checkbox" checked={hideChecked} onChange={e => setHideChecked(e.target.checked)} />
-                <span className="slider" />
-              </label>
-              <span className="toggle-label">Hide checked</span>
-            </div>
+            <button
+              onClick={() => setFilterModalOpen(true)}
+              className="filter-button"
+              aria-haspopup="dialog"
+            >
+              <svg
+                className="filter-icon"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill={isFilterActive ? 'currentColor' : 'none'}
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+              </svg>
+              Filter
+            </button>
 
             <button onClick={handleClearAllClick} disabled={checked.size === 0 || (isLive && sessionRole === 'observer')} className="clear-button">Clear all</button>
           </div>
@@ -379,7 +402,7 @@ export default function App() {
             {isLive && sessionRole === 'editor' && (
               <>
                 <button onClick={() => handleShare('edit')} className="invite-button">Invite</button>
-                <button onClick={() => handleShare('view')} className="invite-secondary">Invite (view only)</button>
+                <button onClick={() => handleShare('view')} className="invite-button">Invite (view only)</button>
               </>
             )}
           </div>
@@ -395,6 +418,14 @@ export default function App() {
           setSessionName={setSessionName}
           onCancel={cancelLiveToggle}
           onConfirm={confirmLiveToggle}
+        />
+      )}
+
+      {filterModalOpen && (
+        <FilterModal
+          visibleStatuses={visibleStatuses}
+          onToggleStatus={toggleVisibleStatus}
+          onClose={() => setFilterModalOpen(false)}
         />
       )}
 
