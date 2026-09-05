@@ -7,7 +7,6 @@ export default function ChampionCard({ champ, status, onSetType, disabled }) {
         <input
           type="checkbox"
           checked={isChecked}
-          disabled={disabled}
           readOnly
           onClick={e => e.preventDefault()}
         />
